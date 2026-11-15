@@ -121,14 +121,14 @@ module Sync_m
 
   # locking methods.
   def sync_try_lock(mode = EX)
-    return unlock if mode == UN
+    return sync_unlock if mode == UN
     @sync_mutex.synchronize do
       sync_try_lock_sub(mode)
     end
   end
 
   def sync_lock(m = EX)
-    return unlock if m == UN
+    return sync_unlock if m == UN
     Thread.handle_interrupt(StandardError => :on_blocking) do
       while true
         @sync_mutex.synchronize do

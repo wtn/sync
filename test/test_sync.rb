@@ -83,4 +83,18 @@ class SyncTest < Test::Unit::TestCase
     assert_raise(Sync_m::Err::LockModeFailer) { tester.sync_unlock(:FOO) }
     assert_equal(true, tester.sync_exclusive?)
   end
+
+  def test_lock_un_without_aliases
+    mod = Module.new { include Sync_m }
+    tester = Class.new { include mod }.new
+    assert_equal(false, tester.respond_to?(:unlock))
+
+    tester.sync_lock(:EX)
+    tester.sync_lock(:UN)
+    assert_equal(false, tester.sync_locked?)
+
+    tester.sync_lock(:EX)
+    tester.sync_try_lock(:UN)
+    assert_equal(false, tester.sync_locked?)
+  end
 end
