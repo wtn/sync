@@ -196,6 +196,9 @@ module Sync_m
             end
           end
         end
+
+      else
+        Err::LockModeFailer.Fail m
       end
 
       if runnable

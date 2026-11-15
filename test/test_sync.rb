@@ -75,4 +75,12 @@ class SyncTest < Test::Unit::TestCase
     assert_raise(Sync_m::Err::LockModeFailer) { tester.sync_lock(:FOO) }
     assert_equal(false, tester.sync_locked?)
   end
+
+  def test_unlock_with_unknown_mode
+    tester = Tester.new
+    tester.sync_lock(:EX)
+
+    assert_raise(Sync_m::Err::LockModeFailer) { tester.sync_unlock(:FOO) }
+    assert_equal(true, tester.sync_exclusive?)
+  end
 end
