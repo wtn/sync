@@ -63,10 +63,7 @@ module Sync_m
     class LockModeFailer < Err
       Message = "Unknown lock mode(%s)"
       def LockModeFailer.Fail(mode)
-        if mode.id2name
-          mode = mode.id2name
-        end
-        super(mode)
+        super(mode.respond_to?(:id2name) ? mode.id2name : mode.inspect)
       end
     end
   end

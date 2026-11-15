@@ -66,4 +66,13 @@ class SyncTest < Test::Unit::TestCase
     assert_equal(tester.sync_waiting.uniq, tester.sync_waiting)
     assert_equal(tester.sync_waiting, [])
   end
+
+  def test_lock_with_non_symbol_mode
+    tester = Tester.new
+
+    assert_raise(Sync_m::Err::LockModeFailer) { tester.sync_lock("EX") }
+    assert_raise(Sync_m::Err::LockModeFailer) { tester.sync_try_lock(nil) }
+    assert_raise(Sync_m::Err::LockModeFailer) { tester.sync_lock(:FOO) }
+    assert_equal(false, tester.sync_locked?)
+  end
 end
