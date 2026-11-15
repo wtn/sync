@@ -143,7 +143,7 @@ module Sync_m
                 sync_upgrade_waiting.push [Thread.current, sync_sh_locker[Thread.current]]
                 sync_sh_locker.delete(Thread.current)
               else
-                unless sync_waiting.include?(Thread.current) || sync_upgrade_waiting.reverse_each.any?{|w| w.first == Thread.current }
+                unless sync_waiting.include?(Thread.current)
                   sync_waiting.push Thread.current
                 end
               end
@@ -151,6 +151,10 @@ module Sync_m
             end
           ensure
             sync_waiting.delete(Thread.current)
+            if (w = sync_upgrade_waiting.assoc(Thread.current))
+              sync_upgrade_waiting.delete(w)
+              sync_sh_locker[Thread.current] = w[1]
+            end
           end
         end
       end
@@ -165,7 +169,8 @@ module Sync_m
         Err::UnknownLocker.Fail(Thread.current)
       end
 
-      m = sync_mode if m == EX and sync_mode == SH
+      m = SH if m == EX and sync_ex_locker != Thread.current and
+        sync_sh_locker.include?(Thread.current)
 
       runnable = false
       case m
@@ -176,11 +181,7 @@ module Sync_m
         if sync_ex_locker == Thread.current
           if (self.sync_ex_count = sync_ex_count - 1) == 0
             self.sync_ex_locker = nil
-            if sync_sh_locker.include?(Thread.current)
-              self.sync_mode = SH
-            else
-              self.sync_mode = UN
-            end
+            self.sync_mode = sync_sh_locker.empty? ? UN : SH
             runnable = true
           end
         else
@@ -207,6 +208,7 @@ module Sync_m
           th, count = sync_upgrade_waiting.shift
           next unless sync_wakeup(th)
           sync_sh_locker[th] = count
+          self.sync_mode = SH if sync_mode == UN
           wakeup_threads.push th
           woken = true
         end

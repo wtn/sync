@@ -72,6 +72,72 @@ class SyncTest < Test::Unit::TestCase
     t.join
   end
 
+  def test_killed_upgrade_waiter
+    tester = Tester.new
+    tester.sync_lock(:SH)
+
+    t = Thread.new do
+      tester.sync_synchronize(:SH) do
+        tester.sync_lock(:EX)
+      end
+    end
+    sleep 0.1 until t.stop?
+    t.kill
+    t.join
+
+    assert_equal([], tester.sync_upgrade_waiting)
+    assert_equal([Thread.current], tester.sync_sh_locker.keys)
+
+    assert_nothing_raised { tester.sync_unlock }
+    assert_equal(:UN, tester.sync_mode)
+    assert_equal(true, tester.sync_try_lock(:EX))
+  end
+
+  def test_interrupted_upgrade_waiter_keeps_shared_lock
+    tester = Tester.new
+    tester.sync_lock(:SH)
+
+    t = Thread.new do
+      tester.sync_synchronize(:SH) do
+        tester.sync_lock(:EX)
+      end
+    end
+    t.report_on_exception = false
+    sleep 0.1 until t.stop?
+    t.raise(ArgumentError, "interrupt")
+
+    assert_raise(ArgumentError) { t.join }
+    assert_equal([], tester.sync_upgrade_waiting)
+    assert_equal([Thread.current], tester.sync_sh_locker.keys)
+
+    tester.sync_unlock
+    assert_equal(:UN, tester.sync_mode)
+  end
+
+  def test_interrupted_upgrade_waiter_under_other_exclusive
+    tester = Tester.new
+    tester.sync_lock(:SH)
+
+    t = Thread.new do
+      tester.sync_synchronize(:SH) do
+        tester.sync_lock(:EX)
+      end
+    end
+    t.report_on_exception = false
+    sleep 0.1 until t.stop?
+    assert_equal(true, tester.sync_try_lock(:EX))
+    t.raise(ArgumentError, "interrupt")
+
+    assert_raise(ArgumentError) { t.join }
+    assert_equal(true, tester.sync_exclusive?)
+
+    tester.sync_unlock
+    assert_equal(:SH, tester.sync_mode)
+    tester.sync_unlock
+    assert_equal(:UN, tester.sync_mode)
+    assert_equal({}, tester.sync_sh_locker)
+  end
+
   def test_sync_lock_and_raise
     tester= Tester.new
     tester.sync_lock(:EX)
