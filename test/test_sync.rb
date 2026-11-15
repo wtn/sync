@@ -48,6 +48,30 @@ class SyncTest < Test::Unit::TestCase
     t.join
   end
 
+  def test_unlock_skips_dead_waiters
+    tester = Tester.new
+    dead = Thread.new {}
+    dead.join
+    tester.sync_lock(:EX)
+    tester.sync_upgrade_waiting.push([dead, 1])
+    tester.sync_waiting.push(dead)
+
+    t = Thread.new do
+      tester.sync_lock(:EX)
+      tester.sync_unlock
+      :done
+    end
+    sleep 0.1 until t.stop?
+
+    assert_nothing_raised { tester.sync_unlock }
+    assert_equal(:done, t.join(5) && t.value)
+    assert_equal({}, tester.sync_sh_locker)
+    assert_equal(:UN, tester.sync_mode)
+  ensure
+    t.kill
+    t.join
+  end
+
   def test_sync_lock_and_raise
     tester= Tester.new
     tester.sync_lock(:EX)

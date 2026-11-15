@@ -202,23 +202,28 @@ module Sync_m
       end
 
       if runnable
-        if sync_upgrade_waiting.size > 0
+        woken = false
+        until woken or sync_upgrade_waiting.empty?
           th, count = sync_upgrade_waiting.shift
+          next unless sync_wakeup(th)
           sync_sh_locker[th] = count
-          th.wakeup
           wakeup_threads.push th
-        else
+          woken = true
+        end
+        unless woken
           wait = sync_waiting
           self.sync_waiting = []
           for th in wait
-            th.wakeup
-            wakeup_threads.push th
+            wakeup_threads.push th if sync_wakeup(th)
           end
         end
       end
     end
     for th in wakeup_threads
-      th.run
+      begin
+        th.run
+      rescue ThreadError
+      end
     end
     self
   end
@@ -263,6 +268,13 @@ module Sync_m
   def initialize(*args)
     super
     sync_initialize
+  end
+
+  def sync_wakeup(th)
+    th.wakeup
+    true
+  rescue ThreadError
+    false
   end
 
   def sync_try_lock_sub(m)
